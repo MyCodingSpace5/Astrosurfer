@@ -1,17 +1,9 @@
-Provide helpful suggestions and guidelines. I want to create an AI that can run on very few resources. import torch
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets
 from torchvision import transforms
-tensor_transform = transforms.ToTensor()
-dataset = datasets.MNIST(root = "./data",
-			 train = True,
-			 download = True,
-			 transform = tensor_transform)
 
-loader = torch.utils.data.DataLoader(dataset = dataset,
-				    batch_size = 32,
-                                    shuffle = True)
 
 
 
@@ -29,11 +21,10 @@ class MultiLatentAttention(nn.Module):
         self.k1_vector = nn.Parameter(torch.zeros(head_dim))
         self.q2_vector = nn.Parameter(torch.zeros(head_dim))
         self.k2_vector = nn.Parameter(torch.zeros(head_dim))
-        self.lambda_vector = torch.exp(torch.matmul(q1_vector, k1_vector)) - torch.exp(torch.matmul(q2_vector, k2_vector))
         self.factor = rope_factor
-    def rope(x):
+    def rope(x, pos):
         dim_size = x.size(-1)
-        theta = 1 / (10000 ** (torch.arange(dim_size / 2).float() / (dim_size / 2))
+        theta = 1 / (10000 ** (torch.arange(dim_size // 2).float() / (dim_size / 2))
         pos_theta = torch.einsum('i,j -> ij', pos, theta)
         sin, cosine = pos_theta.sin(), pos_theta.cos()
         first_half, second_half = x[..., :dim_size // 2], x[..., dim_size // 2:]
@@ -48,6 +39,8 @@ class MultiLatentAttention(nn.Module):
         first_attention_mat = torch.matmul(q1, torch.matmul(torch.transpose(k1, −1, −2), s))
         second_attention_mat = torch.matmulI(q2, torch.matmul(torch.transpose(k2, −1, −2), s))
         return torch.matmul((first_attention_mat - self.lambda_vector * second_attention_mat), value)
+   def forward(x):
+       self.lambda_vector = torch.exp(torch.matmul(self.q1_vector, self.k1_vector)) - torch.exp(torch.matmul(self.q2_vector, self.k2_vector))
 def main(epochs: int):
     discriminator = Discriminator()
     generator = Generator()
