@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets
-from torchvision import transforms
-
-
-
-
+kernel_size = 3
+embedding_dim = 256
+num_heads = 25
+rope_factor = 12
+latent_dim = 128
+residual_stream = torch.zeros(embed_dim)
+dim_size = 64
 class MultiLatentAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, latent_dim, rope_factor):
         torch.utils.checkpoint.CheckpointPolicy(1)
@@ -56,3 +57,25 @@ class MultiLatentAttention(nn.Module):
         return torch.cat(result, result_weight)
    def forward(x):
        self.lambda_vector = torch.exp(torch.matmul(self.q1_vector, self.k1_vector)) - torch.exp(torch.matmul(self.q2_vector, self.k2_vector)) + self.lambda_init
+class Generator(nn.Module):
+    def __init__(self, embedding_size: int, dim_size: int, kernel_size: int):
+        super(Generator, self).__init__()
+        self.denoiser = nn.Sequential(
+            nn.Conv2d(embedding_size, dim_size, kernel_size, padding=kernel_size//2),
+            nn.ReLU(True),
+            nn.Conv2d(dim_size, dim_size * 2, kernel_size * 2, padding=kernel_size),
+            nn.ReLU(True)
+        )
+        self.transposer = nn.Sequential(
+            nn.ConvTranspose2d(dim_size * 2, dim_size, kernel_size * 2, padding=kernel_size),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim_size, embedding_size, kernel_size, padding=kernel_size//2),
+            nn.ReLU(True),
+            nn.Flatten(),
+            nn.Linear(embedding_size * 28 * 28, dim_size),
+            nn.Softmax(dim=1)
+        )
+    def forward(self, x, min_val, max_val):
+        denoised = self.denoiser(x)
+        transposed = self.transposer(denoised)
+        return torch.clamp(transposed, min=min_val, max=max_val)
