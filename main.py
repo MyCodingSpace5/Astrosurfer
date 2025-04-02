@@ -14,6 +14,7 @@ class MultiLatentAttention(nn.Module):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.latent_dim = latent_dim
+        self.lambda_init = torch.zeros(head_dim)
         self.head_dim = embed_dim // num_heads
         self.embed_latent = nn.Linear(embed_dim, latent_dim)
         self.latent_embed = nn.Linear(latent_dim, embed_dim)
@@ -50,8 +51,12 @@ class MultiLatentAttention(nn.Module):
         self.v_cache = self.embed_latent(self.v_cache)
         self.k_cache = self.embed_latent(self.k_cache)
         return output
+   def MultiHeadAttention(self, x, W_Q, W_K, W_V, result_weight):
+        result = nn.GroupNorm([differentialAttentionHead(x, W_Q, W_K, W_V) for i in range(self.num_heads)]
+        result = torch.matmul(result, (1 − self.lambda_init))
+        return torch.cat(result, result_weight)
    def forward(x):
-       self.lambda_vector = torch.exp(torch.matmul(self.q1_vector, self.k1_vector)) - torch.exp(torch.matmul(self.q2_vector, self.k2_vector))
+       self.lambda_vector = torch.exp(torch.matmul(self.q1_vector, self.k1_vector)) - torch.exp(torch.matmul(self.q2_vector, self.k2_vector)) + self.lambda_init
 def main(epochs: int):
     discriminator = Discriminator()
     generator = Generator()
