@@ -94,15 +94,16 @@ class Model(nn.Module):
             out = self.softmax(self.classifier(out))
         return out
 class MixtureOfLayers(nn.Module):
-     def __init___(experts: [nn.Module], gate_layer: nn.Linear, sparsity_number: int, symposium: [nn.Module]):
+     def __init__(experts: [nn.Module], gate_layer: nn.Linear, sparsity_number: int):
          self.expert_list =  nn.ModuleList(experts)
-         self.softmax_layer = nn.Softmax(len(experts))
+         self.softmax_layer = nn.Softmax(dim=-1)
          assert sparsity_number < len(experts), "Sparsity number cannot be equal or greater than the length of experts, this would negate the MoE layer"
     def forward(x):
-        x_gates = self.softmax_layer(gate_layer(x), dim=-1)
+        x_gates = self.softmax_layer(gate_layer(x))
         multnomial_probs = torch.multinomial(x_gates, sparsity_number, replacement=False)
-        symposium.append(self.expert_list[item] for item in multinomial_probs) 
+        symposium = [experts[i] for i in multinomial_probs]
         output = torch.stack([item_dx(x) for item_dx in symposium])
-        return output
+        outputs_weights = torch.matmul(x_gates, output)
+        return outputs_weights
 
         
