@@ -34,9 +34,9 @@ class MultiLatentAttention(nn.Module):
         cos_part = x[..., dim_size // 2:] * pos_theta.cos()
         return torch.cat([sin_part, cos_part], dim=-1)
     def differential_attention_head(self, x):
-        query = self.projectionMatrice(torch.matmul(x, self.WQ))
-        key = self.projectionMatrice(torch.matmul(x, self.WK))
-        value = self.projectionMatrice(torch.matmul(x, self.WV))
+        query = self.projectionMatrice(torch.cat(torch.matmul(x, self.WQ), rope(torch.matmul(x, self.WQ))))
+        key = self.embed_latent(torch.cat(torch.matmul(x, self.WK), rope(torch.matmul(x, self.WK))))
+        value = self.embed_latent(torch.cat(torch.matmul(x, self.WV), rope(torch.matmul(x, self.WV))))
         if self.key_cache is None:
             self.key_cache = key
             self.value_cache = value
@@ -44,12 +44,12 @@ class MultiLatentAttention(nn.Module):
             self.key_cache = torch.cat([self.key_cache, key], dim=1)
             self.value_cache = torch.cat([self.value_cache, value], dim=1)
         q1, q2 = query.chunk(2, dim=-1)
-        k1, k2 = self.key_cache.chunk(2, dim=-1)
+        k1, k2 = self.projectionMatrice(self.latent_embed(self.key_cache.chunk(2, dim=-1)))
         scale = 1 / math.sqrt(self.head_dim)
         attn_1 = torch.matmul(q1, k1.transpose(-1, -2)) * scale
         attn_2 = torch.matmul(q2, k2.transpose(-1, -2)) * scale
         lambda_vector = torch.exp(torch.dot(self.q1_vector, self.k1_vector)) - torch.exp(torch.dot(self.q2_vector, self.k2_vector)) + self.lambda_init
-        output = torch.matmul((attn_1 - lambda_vector * attn_2), self.value_cache)
+        output = torch.matmul((attn_1 - lambda_vector * attn_2), self.projectionMatrice(self.latent_embed(self.value_cache)))
         return output
     def forward(self, x):
         heads = [self.differential_attention_head(x) for _ in range(self.num_heads)]
